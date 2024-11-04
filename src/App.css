@@ -1,73 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap');
+
 #root {
-  max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem;
+  font-family: 'Orbitron', sans-serif;
+  background: linear-gradient(145deg, #1a202c 0%, #2d3748 100%);
+  min-height: 100vh;
+  color: white;
+}
+
+.game-title {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  background: linear-gradient(45deg, #00f2fe, #4facfe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 20px rgba(79, 172, 254, 0.5);
   text-align: center;
+  padding: 0 1rem;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
 .grid-container {
   display: grid;
-  grid-template-columns: repeat(5, 100px); /* 4 equal columns of 100px */
-  gap: 10px; /* Spacing between cells */
-  justify-content: center; /* Center the grid */
-  margin-top: 20px;
+  grid-template-columns: repeat(5, minmax(60px, 100px));
+  gap: clamp(8px, 2vw, 15px);
+  justify-content: center;
+  margin: 10px auto;
+  padding: clamp(10px, 3vw, 20px);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  width: fit-content;
+  max-width: 95vw;
 }
 
 .grid-item {
-  background-color: lightgray;
-  border: 2px solid #ccc;
-  height: 100px; /* Same height for all cells */
+  aspect-ratio: 1;
+  width: 100%;
+  height: auto;
+  font-size: clamp(20px, 4vw, 28px);
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 24px; /* Text size inside cells */
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-.grid-item:hover {
-  background-color: #f0f0f0; /* Slight color change on hover */
+/* Player 1 hover style */
+.player1-turn .grid-item:not(.cursor-not-allowed):hover {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.3), rgba(244, 114, 182, 0.3));
+  border-color: #ec4899;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.3);
 }
 
-.relative {
-  position: relative;
+.player2-turn .grid-item:not(.cursor-not-allowed):hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(147, 197, 253, 0.3));
+  border-color: #3b82f6;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
 }
 
-.absolute {
-  position: absolute;
+.grid-item.cursor-not-allowed {
+  background: rgba(255, 255, 255, 0.05);
+  cursor: not-allowed;
+  opacity: 0.7;
 }
+
+.player-info {
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  backdrop-filter: blur(5px);
+  max-width: 90%;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* Add these styles for the numbers */
+.text-pink-400 {
+  color: #ec4899;
+  text-shadow: 0 0 10px rgba(236, 72, 153, 0.3);
+}
+
+.text-blue-400 {
+  color: #3b82f6;
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+}
+
+/* Add style for auto-filled X's */
+.text-gray-400 {
+  color: #9ca3af;
+  text-shadow: 0 0 10px rgba(156, 163, 175, 0.3);
+}
+
+/* Add responsive styles for the menu */
+@media (max-width: 768px) {
+  .cell-menu {
+    position: fixed;
+    bottom: 20px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    top: auto !important;
+    width: 90%;
+    max-width: 200px;
+  }
+
+  .button-container {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .button-container button {
+    width: 80%;
+    max-width: 200px;
+  }
+}
+
+/* Add this new style for non-started game */
+.game-not-started .grid-item {
+  cursor: default !important;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.game-not-started .grid-item:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+}
+
