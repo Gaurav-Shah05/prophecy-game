@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import Buttons from './Buttons';
 import CellMenu from './CellMenu';
+import ScoreDisplay from './ScoreDisplay';
 
 const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) => {
   const initialGrid = Array(4).fill().map(() => Array(5).fill(null));
@@ -14,6 +15,11 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
   const [autoFilledCells, setAutoFilledCells] = useState(
     Array(4).fill().map(() => Array(5).fill(false))
   );
+  const [isGameOver, setIsGameOver] = useState(false);
+  const [player1Score, setPlayer1Score] = useState(0);
+  const [player2Score, setPlayer2Score] = useState(0);
+  const [winner, setWinner] = useState(null);
+
 
   // Get unavailable numbers for a specific cell
   const getUnavailableNumbers = (rowIndex, colIndex, currentGrid) => {
@@ -32,6 +38,73 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
 
     return unavailableNums;
   };
+
+// Helper function to check if a line is complete (all cells filled)
+const isLineComplete = (line) => {
+  return line.every(cell => cell !== null);
+};
+
+  // Calculate scores
+  const calculateScores = (currentGrid, currentPlayerMoves) => {
+    let score1 = 0;
+    let score2 = 0;
+
+    // Check rows
+    for (let i = 0; i < currentGrid.length; i++) {
+      const row = currentGrid[i];
+      // Only calculate score if row is complete
+      if (isLineComplete(row)) {
+        const numberCount = row.filter(cell => !isNaN(cell) && cell !== 'X').length;
+        
+        // Check each prophecy in this row
+        row.forEach((cell, j) => {
+          if (!isNaN(cell) && cell !== 'X') {
+            const prophecy = parseInt(cell);
+            if (prophecy === numberCount) {
+              if (currentPlayerMoves[i][j] === 'Player 1') {
+                score1 += numberCount;
+              } else if (currentPlayerMoves[i][j] === 'Player 2') {
+                score2 += numberCount;
+              }
+            }
+          }
+        });
+      }
+    }
+
+    // Check columns
+    for (let j = 0; j < currentGrid[0].length; j++) {
+      const column = currentGrid.map(row => row[j]);
+      // Only calculate score if column is complete
+      if (isLineComplete(column)) {
+        const numberCount = column.filter(cell => !isNaN(cell) && cell !== 'X').length;
+        
+        // Check each prophecy in this column
+        column.forEach((cell, i) => {
+          if (!isNaN(cell) && cell !== 'X') {
+            const prophecy = parseInt(cell);
+            if (prophecy === numberCount) {
+              if (currentPlayerMoves[i][j] === 'Player 1') {
+                score1 += numberCount;
+              } else if (currentPlayerMoves[i][j] === 'Player 2') {
+                score2 += numberCount;
+              }
+            }
+          }
+        });
+      }
+    }
+
+    return { score1, score2 };
+  };
+    // Update scores in real-time
+    useEffect(() => {
+      if (gameStarted && !isGameOver) {
+        const { score1, score2 } = calculateScores(grid, playerMoves);
+        setPlayer1Score(score1);
+        setPlayer2Score(score2);
+      }
+    }, [grid, gameStarted]);
 
   // Check if any cell has only one possible option and fill it
   const checkAndAutoFill = (currentGrid) => {
@@ -64,11 +137,57 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
     return gridChanged ? newGrid : null;
   };
 
+  // Check if the grid is full
+  const checkGameOver = (currentGrid) => {
+    const isFull = currentGrid.every(row => 
+      row.every(cell => cell !== null)
+    );
+    
+    if (isFull) {
+      const { score1, score2 } = calculateScores(currentGrid, playerMoves);
+      setPlayer1Score(score1);
+      setPlayer2Score(score2);
+      
+      // Determine winner
+      if (score1 > score2) {
+        setWinner('Player 1');
+      } else if (score2 > score1) {
+        setWinner('Player 2');
+      } else {
+        setWinner('tie');
+      }
+      
+      setIsGameOver(true);
+    }
+  };
+
+  const handleCellClick = (rowIndex, colIndex, event) => {
+    if (!gameStarted || grid[rowIndex][colIndex] !== null) return;
+    
+    const cellRect = event.currentTarget.getBoundingClientRect();
+    const windowHeight = window.innerHeight;
+    const menuHeight = 200;
+    
+    const spaceBelow = windowHeight - cellRect.bottom;
+    const showAbove = spaceBelow < menuHeight;
+    
+    setMenuPosition({
+      top: showAbove ? (cellRect.top + 'px') : (cellRect.bottom + 'px'),
+      left: cellRect.right + 'px',
+      showAbove: showAbove
+    });
+    setSelectedCell({ rowIndex, colIndex });
+  };
+
   const handleMenuSelect = (value) => {
     if (!selectedCell) return;
 
-    // Save current state to history
-    setMoveHistory([...moveHistory, grid]);
+    setMoveHistory([...moveHistory, {
+      grid: grid.map(row => [...row]),
+      playerMoves: playerMoves.map(row => [...row]),
+      player1Score,
+      player2Score
+    }]);
     setPlayerHistory([...playerHistory, currentPlayer]);
 
     // Update the selected cell
@@ -102,42 +221,10 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
     setMenuPosition(null);
     setSelectedCell(null);
     setCurrentPlayer(currentPlayer === 'Player 1' ? 'Player 2' : 'Player 1');
+
+    checkGameOver(newGrid);
   };
 
-  // Add click outside handler
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuPosition && !event.target.closest('.grid-item')) {
-        setMenuPosition(null);
-        setSelectedCell(null);
-      }
-    };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [menuPosition]);
-
-  // Handle cell click and show menu
-  const handleCellClick = (rowIndex, colIndex, event) => {
-    if (!gameStarted || grid[rowIndex][colIndex] !== null) return;
-    
-    const cellRect = event.currentTarget.getBoundingClientRect();
-    const windowHeight = window.innerHeight;
-    const menuHeight = 200; // Approximate height of menu including padding
-    
-    // Check if there's enough space below the cell
-    const spaceBelow = windowHeight - cellRect.bottom;
-    const showAbove = spaceBelow < menuHeight;
-    
-    setMenuPosition({
-      top: showAbove ? (cellRect.top + 'px') : (cellRect.bottom + 'px'),
-      left: cellRect.right + 'px',
-      showAbove: showAbove
-    });
-    setSelectedCell({ rowIndex, colIndex });
-  };
-
-  // Handle menu close
   const handleMenuClose = () => {
     setMenuPosition(null);
     setSelectedCell(null);
@@ -150,20 +237,13 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
   const handleUndo = () => {
     if (moveHistory.length === 0) return;
 
-    // Get the last state from history
-    const previousGrid = moveHistory[moveHistory.length - 1];
+    const lastMove = moveHistory[moveHistory.length - 1];
     const previousPlayer = playerHistory[playerHistory.length - 1];
     
-    // Reset playerMoves for the undone cells
-    const newPlayerMoves = playerMoves.map((row, i) => 
-      row.map((player, j) => 
-        previousGrid[i][j] === null ? null : player
-      )
-    );
-
-    // Update current state
-    setGrid(previousGrid);
-    setPlayerMoves(newPlayerMoves);
+    setGrid(lastMove.grid);
+    setPlayerMoves(lastMove.playerMoves);
+    setPlayer1Score(lastMove.player1Score);
+    setPlayer2Score(lastMove.player2Score);
     setCurrentPlayer(previousPlayer);
 
     // Remove the last state from history
@@ -178,40 +258,66 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
     setCurrentPlayer('Player 1');
     setMoveHistory([]);
     setPlayerHistory([]);
+    setPlayer1Score(0);
+    setPlayer2Score(0);
+    setIsGameOver(false);
+    setWinner(null);
   };
+  
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuPosition && !event.target.closest('.grid-item')) {
+        setMenuPosition(null);
+        setSelectedCell(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [menuPosition]);
 
   return (
     <div className="relative">
-      <div className={`grid-container ${!gameStarted 
-        ? 'game-not-started' 
-        : currentPlayer === 'Player 1' 
-          ? 'player1-turn' 
-          : 'player2-turn'}`}>
-        {grid.map((row, rowIndex) =>
-          row.map((cell, colIndex) => (
-            <div
-              key={`${rowIndex}-${colIndex}`}
-              className={`grid-item ${cell !== null ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-              onClick={(e) => handleCellClick(rowIndex, colIndex, e)}
-            >
-              {cell && (
-                <span 
-                  className={`
-                    ${autoFilledCells[rowIndex][colIndex] 
-                      ? 'text-gray-400' 
-                      : playerMoves[rowIndex][colIndex] === 'Player 1' 
-                        ? 'text-pink-400' 
-                        : 'text-blue-400'
-                    }
-                  `}
-                >
-                  {cell}
-                </span>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+      <ScoreDisplay
+        isGameOver={isGameOver}
+        player1Score={player1Score}
+        player2Score={player2Score}
+        gameStarted={gameStarted}
+        winner={winner}
+      />
+      
+      {(!isGameOver || !gameStarted) && (
+        <div className={`grid-container ${!gameStarted 
+          ? 'game-not-started' 
+          : currentPlayer === 'Player 1' 
+            ? 'player1-turn' 
+            : 'player2-turn'}`}>
+          {grid.map((row, rowIndex) =>
+            row.map((cell, colIndex) => (
+              <div
+                key={`${rowIndex}-${colIndex}`}
+                className={`grid-item ${cell !== null ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                onClick={(e) => handleCellClick(rowIndex, colIndex, e)}
+              >
+                {cell && (
+                  <span 
+                    className={`
+                      ${autoFilledCells[rowIndex][colIndex] 
+                        ? 'text-gray-400' 
+                        : playerMoves[rowIndex][colIndex] === 'Player 1' 
+                          ? 'text-pink-400' 
+                          : 'text-blue-400'
+                      }
+                    `}
+                  >
+                    {cell}
+                  </span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
       
       {menuPosition && selectedCell && (
         <CellMenu
@@ -223,17 +329,19 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
         />
       )}
       
-      <div className="flex justify-center gap-4">
+      <div className="flex justify-center gap-4 mt-4">
         {!gameStarted ? (
           <Buttons text="Start Game" onClick={handleStartGame} />
         ) : (
           <>
-            <Buttons 
-              text="Undo" 
-              onClick={handleUndo}
-              otherClass={moveHistory.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
-            />
-            <Buttons text="Quit Game" onClick={handleQuitGame} />
+            {!isGameOver && (
+              <Buttons 
+                text="Undo" 
+                onClick={handleUndo}
+                otherClass={moveHistory.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
+              />
+            )}
+            <Buttons text={isGameOver ? "New Game" : "Quit Game"} onClick={handleQuitGame} />
           </>
         )}
       </div>
