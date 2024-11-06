@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
+import { useNavigate } from 'react-router-dom';
 import Buttons from './Buttons';
 import CellMenu from './CellMenu';
 import ScoreDisplay from './ScoreDisplay';
+import { RandomBot } from '../game/bot';
+import { OptimalBot } from '../game/optimal-bot';   
+import '../App.css';
 
-const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) => {
+const Grid = ({ gameMode = 'two-player', playerTurn = 'first', gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) => {
+  const navigate = useNavigate();
   const initialGrid = Array(4).fill().map(() => Array(5).fill(null));
   const [grid, setGrid] = useState(initialGrid);
   const [menuPosition, setMenuPosition] = useState(null);
@@ -19,7 +23,8 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
   const [player1Score, setPlayer1Score] = useState(0);
   const [player2Score, setPlayer2Score] = useState(0);
   const [winner, setWinner] = useState(null);
-
+  const [bot] = useState(gameMode === 'single-player' ? new OptimalBot() : null);
+  const [isBotThinking, setIsBotThinking] = useState(false);
 
   // Get unavailable numbers for a specific cell
   const getUnavailableNumbers = (rowIndex, colIndex, currentGrid) => {
@@ -39,10 +44,10 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
     return unavailableNums;
   };
 
-// Helper function to check if a line is complete (all cells filled)
-const isLineComplete = (line) => {
-  return line.every(cell => cell !== null);
-};
+  // Helper function to check if a line is complete (all cells filled)
+  const isLineComplete = (line) => {
+    return line.every(cell => cell !== null);
+  };
 
   // Calculate scores
   const calculateScores = (currentGrid, currentPlayerMoves) => {
@@ -97,14 +102,41 @@ const isLineComplete = (line) => {
 
     return { score1, score2 };
   };
-    // Update scores in real-time
-    useEffect(() => {
-      if (gameStarted && !isGameOver) {
-        const { score1, score2 } = calculateScores(grid, playerMoves);
-        setPlayer1Score(score1);
-        setPlayer2Score(score2);
-      }
-    }, [grid, gameStarted]);
+
+  // Update scores in real-time
+  useEffect(() => {
+    if (gameStarted && !isGameOver) {
+      const { score1, score2 } = calculateScores(grid, playerMoves);
+      setPlayer1Score(score1);
+      setPlayer2Score(score2);
+    }
+  }, [grid, gameStarted]);
+
+  // Bot move effect
+  useEffect(() => {
+    if (gameMode === 'single-player' && 
+        gameStarted && 
+        !isGameOver && 
+        ((playerTurn === 'second' && currentPlayer === 'Player 1') ||
+         (playerTurn === 'first' && currentPlayer === 'Player 2'))) {
+      makeBotMove();
+    }
+  }, [currentPlayer, gameStarted, isGameOver]);
+
+  const makeBotMove = async () => {
+    setIsBotThinking(true);
+    
+    // Add a small delay to make the bot's move feel more natural
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const botMove = bot.makeMove(grid, getUnavailableNumbers);
+    
+    if (botMove) {
+      handleMenuSelect(botMove.value, botMove.row, botMove.col);
+    }
+    
+    setIsBotThinking(false);
+  };
 
   // Check if any cell has only one possible option and fill it
   const checkAndAutoFill = (currentGrid) => {
@@ -162,7 +194,14 @@ const isLineComplete = (line) => {
   };
 
   const handleCellClick = (rowIndex, colIndex, event) => {
-    if (!gameStarted || grid[rowIndex][colIndex] !== null) return;
+    if (!gameStarted || 
+        grid[rowIndex][colIndex] !== null || 
+        isBotThinking || 
+        (gameMode === 'single-player' && 
+         ((playerTurn === 'second' && currentPlayer === 'Player 1') ||
+          (playerTurn === 'first' && currentPlayer === 'Player 2')))) {
+      return;
+    }
     
     const cellRect = event.currentTarget.getBoundingClientRect();
     const windowHeight = window.innerHeight;
@@ -179,8 +218,9 @@ const isLineComplete = (line) => {
     setSelectedCell({ rowIndex, colIndex });
   };
 
-  const handleMenuSelect = (value) => {
-    if (!selectedCell) return;
+  const handleMenuSelect = (value, forcedRow = null, forcedCol = null) => {
+    const rowIndex = forcedRow !== null ? forcedRow : selectedCell.rowIndex;
+    const colIndex = forcedCol !== null ? forcedCol : selectedCell.colIndex;
 
     setMoveHistory([...moveHistory, {
       grid: grid.map(row => [...row]),
@@ -196,9 +236,9 @@ const isLineComplete = (line) => {
     let newAutoFilled = autoFilledCells.map(row => [...row]);
     
     // Store which player made this move and mark as not auto-filled
-    newGrid[selectedCell.rowIndex][selectedCell.colIndex] = value;
-    newPlayerMoves[selectedCell.rowIndex][selectedCell.colIndex] = currentPlayer;
-    newAutoFilled[selectedCell.rowIndex][selectedCell.colIndex] = false;
+    newGrid[rowIndex][colIndex] = value;
+    newPlayerMoves[rowIndex][colIndex] = currentPlayer;
+    newAutoFilled[rowIndex][colIndex] = false;
 
     // Check for auto-fill opportunities
     let autoFilledGrid = checkAndAutoFill(newGrid);
@@ -232,10 +272,15 @@ const isLineComplete = (line) => {
 
   const handleStartGame = () => {
     setGameStarted(true);
+    // If playing second in single-player mode, trigger bot's first move
+    if (gameMode === 'single-player' && playerTurn === 'second') {
+      setCurrentPlayer('Player 1');
+    }
   };
 
   const handleUndo = () => {
-    if (moveHistory.length === 0) return;
+    if (moveHistory.length === 0 || 
+        (gameMode === 'single-player' && isBotThinking)) return;
 
     const lastMove = moveHistory[moveHistory.length - 1];
     const previousPlayer = playerHistory[playerHistory.length - 1];
@@ -252,16 +297,7 @@ const isLineComplete = (line) => {
   };
 
   const handleQuitGame = () => {
-    setGameStarted(false);
-    setGrid(initialGrid);
-    setPlayerMoves(Array(4).fill().map(() => Array(5).fill(null)));
-    setCurrentPlayer('Player 1');
-    setMoveHistory([]);
-    setPlayerHistory([]);
-    setPlayer1Score(0);
-    setPlayer2Score(0);
-    setIsGameOver(false);
-    setWinner(null);
+    navigate('/');
   };
   
   useEffect(() => {
@@ -286,6 +322,12 @@ const isLineComplete = (line) => {
         winner={winner}
       />
       
+      {isBotThinking && (
+        <div className="text-center text-gray-400 mt-2 mb-4">
+          Bot is thinking...
+        </div>
+      )}
+
       {(!isGameOver || !gameStarted) && (
         <div className={`grid-container ${!gameStarted 
           ? 'game-not-started' 
@@ -338,7 +380,9 @@ const isLineComplete = (line) => {
               <Buttons 
                 text="Undo" 
                 onClick={handleUndo}
-                otherClass={moveHistory.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
+                otherClass={moveHistory.length === 0 || 
+                  (gameMode === 'single-player' && isBotThinking) 
+                  ? 'opacity-50 cursor-not-allowed' : ''}
               />
             )}
             <Buttons text={isGameOver ? "New Game" : "Quit Game"} onClick={handleQuitGame} />
