@@ -99,6 +99,41 @@
   text-shadow: 0 0 10px rgba(156, 163, 175, 0.3);
 }
 
+.glowing {
+  position: relative;
+}
+
+.glowing.row-glow-pink {
+  box-shadow: 0 0 10px 4px #ec4899(255, 105, 180, 0.7); /* Pink glow for row */
+}
+
+.glowing.row-glow-blue {
+  box-shadow: 0 0 10px 4px #3b82f6(100, 149, 237, 0.7); /* Blue glow for row */
+}
+
+/* Column Glow Effects */
+.glowing.col-glow-pink {
+  box-shadow: 0 0 10px 4px #ec4899(255, 105, 180, 0.7); /* Pink glow for column */
+}
+
+.glowing.col-glow-blue {
+  box-shadow: 0 0 10px 4px #3b82f6(100, 149, 237, 0.7); /* Blue glow for column */
+}
+
+/* Double Glow Effects */
+.double-glow-pink-pink {
+  box-shadow: 
+    0 0 10px 4px #ec4899(255, 105, 180, 0.7), /* Pink glow for row */
+    0 0 10px 4px #ec4899(255, 105, 180, 0.7); /* Pink glow for column */
+}
+
+.double-glow-blue-blue {
+  box-shadow: 
+    0 0 10px 4px #3b82f6(100, 149, 237, 0.7), /* Blue glow for row */
+    0 0 10px 4px #3b82f6(100, 149, 237, 0.7); /* Blue glow for column */
+}
+
+
 /* Add responsive styles for the menu */
 @media (max-width: 768px) {
   .cell-menu {
