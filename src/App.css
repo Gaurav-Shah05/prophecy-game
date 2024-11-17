@@ -103,34 +103,32 @@
   position: relative;
 }
 
-.glowing.row-glow-pink {
-  box-shadow: 0 0 10px 4px #ec4899(255, 105, 180, 0.7); /* Pink glow for row */
+.row-glow-pink {
+  box-shadow: 0 0 15px 3px rgba(236, 72, 153, 0.7); /* Pink glow using #ec4899 */
 }
 
-.glowing.row-glow-blue {
-  box-shadow: 0 0 10px 4px #3b82f6(100, 149, 237, 0.7); /* Blue glow for row */
+.row-glow-blue {
+  box-shadow: 0 0 15px 3px rgba(59, 130, 246, 0.7); /* Blue glow using #3b82f6 */
 }
 
-/* Column Glow Effects */
-.glowing.col-glow-pink {
-  box-shadow: 0 0 10px 4px #ec4899(255, 105, 180, 0.7); /* Pink glow for column */
+.col-glow-pink {
+  box-shadow: 0 0 15px 3px rgba(236, 72, 153, 0.7); /* Pink glow using #ec4899 */
 }
 
-.glowing.col-glow-blue {
-  box-shadow: 0 0 10px 4px #3b82f6(100, 149, 237, 0.7); /* Blue glow for column */
+.col-glow-blue {
+  box-shadow: 0 0 15px 3px rgba(59, 130, 246, 0.7); /* Blue glow using #3b82f6 */
 }
+
 
 /* Double Glow Effects */
 .double-glow-pink-pink {
-  box-shadow: 
-    0 0 10px 4px #ec4899(255, 105, 180, 0.7), /* Pink glow for row */
-    0 0 10px 4px #ec4899(255, 105, 180, 0.7); /* Pink glow for column */
+  border-radius: 50%; 
+  box-shadow: 0 0 15px 3px rgba(236, 72, 153, 0.7); /* Pink glow using #ec4899 */  
 }
 
 .double-glow-blue-blue {
-  box-shadow: 
-    0 0 10px 4px #3b82f6(100, 149, 237, 0.7), /* Blue glow for row */
-    0 0 10px 4px #3b82f6(100, 149, 237, 0.7); /* Blue glow for column */
+  border-radius: 50%; 
+  box-shadow: 0 0 15px 3px rgba(59, 130, 246, 0.7); /* Blue glow using #3b82f6 */
 }
 
 

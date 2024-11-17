@@ -84,7 +84,7 @@ const isLineComplete = (line) => {
                         : cell));
                 } else {
                   setGlowingCells(prev => [...prev, { row: i, col: j, row_color: 'blue' }]);
-                }              }
+                }  }
             }
           }
         });
@@ -277,13 +277,20 @@ const isLineComplete = (line) => {
 
     const lastMove = moveHistory[moveHistory.length - 1];
     const previousPlayer = playerHistory[playerHistory.length - 1];
-    
+
     setGrid(lastMove.grid);
     setPlayerMoves(lastMove.playerMoves);
     setPlayer1Score(lastMove.player1Score);
     setPlayer2Score(lastMove.player2Score);
     setCurrentPlayer(previousPlayer);
 
+    // const previousGlowingCells = glowingCellHistory[glowingCellHistory.length - 1];
+    // setGlowingCells(previousGlowingCells);  // Set glowing cells back to previous state
+    // setGlowingCellHistory(glowingCellHistory.slice(0, -1));  // Remove the last glowing state from history
+    // console.log(glowingCells);
+    // console.log(previousGlowingCells);
+    
+  
     // Remove the last state from history
     setMoveHistory(moveHistory.slice(0, -1));
     setPlayerHistory(playerHistory.slice(0, -1));
@@ -355,17 +362,20 @@ const isLineComplete = (line) => {
                 else if (glowingCell.col_color) {
                   glowingClass += ` col-glow-${glowingCell.col_color}`;
                 }
+                console.log(glowingClass);
               }
+
+              
               
   
               return (
-                <div
-                  key={`${rowIndex}-${colIndex}`}
-                  className={`grid-item ${
-                    cell !== null ? 'cursor-not-allowed' : 'cursor-pointer'
-                  } ${glowingClass}`}
-                  onClick={(e) => handleCellClick(rowIndex, colIndex, e)}
-                >
+                  <div
+                    key={`${rowIndex}-${colIndex}`}
+                    className={`grid-item ${
+                      cell !== null ? 'cursor-not-allowed' : 'cursor-pointer'
+                    } ${glowingClass}`} // Apply glowingClass here
+                    onClick={(e) => handleCellClick(rowIndex, colIndex, e)}                
+                  >
                   {cell && (
                     <span
                       className={`${
