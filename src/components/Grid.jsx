@@ -25,6 +25,7 @@ const Grid = ({ gameMode = 'two-player', playerTurn = 'first', gameStarted, setG
   const [winner, setWinner] = useState(null);
   const [bot] = useState(gameMode === 'single-player' ? new OptimalBot() : null);
   const [isBotThinking, setIsBotThinking] = useState(false);
+  const botWorker = new Worker(new URL('../game/botWorker.js', import.meta.url));
 
   // Get unavailable numbers for a specific cell
   const getUnavailableNumbers = (rowIndex, colIndex, currentGrid) => {
@@ -123,19 +124,32 @@ const Grid = ({ gameMode = 'two-player', playerTurn = 'first', gameStarted, setG
     }
   }, [currentPlayer, gameStarted, isGameOver]);
 
+// Clean up worker when component unmounts
+  useEffect(() => {
+    return () => {
+      botWorker.terminate();
+    };
+  }, []);
+
   const makeBotMove = async () => {
+    if (!bot) return;
+    
     setIsBotThinking(true);
     
     // Add a small delay to make the bot's move feel more natural
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const botMove = bot.makeMove(grid, getUnavailableNumbers);
-    
-    if (botMove) {
-      handleMenuSelect(botMove.value, botMove.row, botMove.col);
+    await new Promise(resolve => setTimeout(resolve, 500));
+  
+    try {
+      const botMove = bot.makeMove(grid, getUnavailableNumbers);
+      
+      if (botMove) {
+        handleMenuSelect(botMove.value, botMove.row, botMove.col);
+      }
+    } catch (error) {
+      console.error('Error in bot move:', error);
+    } finally {
+      setIsBotThinking(false);
     }
-    
-    setIsBotThinking(false);
   };
 
   // Check if any cell has only one possible option and fill it
