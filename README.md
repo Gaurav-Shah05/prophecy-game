@@ -6,3 +6,7 @@ Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+**NOTE:**
+- Switching between Random and Optimal Bot for the Single Player Mode:
+In [line 26 of Grid.jsx](./src/components/Grid.jsx#L26), replace `OptimalBot()` with `RandomBot()` or the other way around to switch between them.

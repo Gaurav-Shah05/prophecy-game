@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
+import { useNavigate } from 'react-router-dom';
 import Buttons from './Buttons';
 import CellMenu from './CellMenu';
 import ScoreDisplay from './ScoreDisplay';
+import { RandomBot } from '../game/bot';
+import { OptimalBot } from '../game/optimal-bot';   
+import '../App.css';
 
-const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) => {
+const Grid = ({ gameMode = 'two-player', playerTurn = 'first', gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) => {
+  const navigate = useNavigate();
   const initialGrid = Array(4).fill().map(() => Array(5).fill(null));
   const [grid, setGrid] = useState(initialGrid);
   const [menuPosition, setMenuPosition] = useState(null);
@@ -19,9 +23,9 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
   const [player1Score, setPlayer1Score] = useState(0);
   const [player2Score, setPlayer2Score] = useState(0);
   const [winner, setWinner] = useState(null);
-  const [glowingCells, setGlowingCells] = useState([]); 
-
-
+  const [bot] = useState(gameMode === 'single-player' ? new OptimalBot() : null);
+  const [isBotThinking, setIsBotThinking] = useState(false);
+  const botWorker = new Worker(new URL('../game/botWorker.js', import.meta.url));
 
   // Get unavailable numbers for a specific cell
   const getUnavailableNumbers = (rowIndex, colIndex, currentGrid) => {
@@ -41,16 +45,15 @@ const Grid = ({ gameStarted, setGameStarted, currentPlayer, setCurrentPlayer }) 
     return unavailableNums;
   };
 
-// Helper function to check if a line is complete (all cells filled)
-const isLineComplete = (line) => {
-  return line.every(cell => cell !== null);
-};
+  // Helper function to check if a line is complete (all cells filled)
+  const isLineComplete = (line) => {
+    return line.every(cell => cell !== null);
+  };
 
   // Calculate scores
   const calculateScores = (currentGrid, currentPlayerMoves) => {
     let score1 = 0;
     let score2 = 0;
-    const cell = [];
 
     // Check rows
     for (let i = 0; i < currentGrid.length; i++) {
@@ -58,33 +61,17 @@ const isLineComplete = (line) => {
       // Only calculate score if row is complete
       if (isLineComplete(row)) {
         const numberCount = row.filter(cell => !isNaN(cell) && cell !== 'X').length;
+        
         // Check each prophecy in this row
         row.forEach((cell, j) => {
           if (!isNaN(cell) && cell !== 'X') {
             const prophecy = parseInt(cell);
-            const existingCell = glowingCells.find(c => c.row === i && c.col === j);
             if (prophecy === numberCount) {
               if (currentPlayerMoves[i][j] === 'Player 1') {
                 score1 += numberCount;
-                if(existingCell ){
-                  setGlowingCells(prev => 
-                    prev.map(cell =>
-                      cell.row === i && cell.col === j 
-                        ? { ...cell, row_color: 'pink' } 
-                        : cell));
-                } else {
-                  setGlowingCells(prev => [...prev, { row: i, col: j, row_color: 'pink' }]);
-                }              } else if (currentPlayerMoves[i][j] === 'Player 2') {
+              } else if (currentPlayerMoves[i][j] === 'Player 2') {
                 score2 += numberCount;
-                if(existingCell ){
-                  setGlowingCells(prev => 
-                    prev.map(cell =>
-                      cell.row === i && cell.col === j 
-                        ? { ...cell, row_color: 'blue' } 
-                        : cell));
-                } else {
-                  setGlowingCells(prev => [...prev, { row: i, col: j, row_color: 'blue' }]);
-                }  }
+              }
             }
           }
         });
@@ -102,47 +89,68 @@ const isLineComplete = (line) => {
         column.forEach((cell, i) => {
           if (!isNaN(cell) && cell !== 'X') {
             const prophecy = parseInt(cell);
-            const existingCell = glowingCells.find(c => c.row === i && c.col === j);
             if (prophecy === numberCount) {
               if (currentPlayerMoves[i][j] === 'Player 1') {
                 score1 += numberCount;
-                if(existingCell ){
-                  setGlowingCells(prev => 
-                    prev.map(cell =>
-                      cell.row === i && cell.col === j 
-                        ? { ...cell, col_color: 'pink' } 
-                        : cell));
-                } else {
-                  setGlowingCells(prev => [...prev, { row: i, col: j, col_color: 'pink' }]);
-                }
               } else if (currentPlayerMoves[i][j] === 'Player 2') {
                 score2 += numberCount;
-                if(existingCell ){
-                  setGlowingCells(prev => 
-                    prev.map(cell =>
-                      cell.row === i && cell.col === j 
-                        ? { ...cell, col_color: 'blue' } 
-                        : cell));
-                } else {
-                  setGlowingCells(prev => [...prev, { row: i, col: j, col_color: 'blue' }]);
-                }}
+              }
             }
           }
         });
       }
     }
 
-    return { score1, score2};
+    return { score1, score2 };
   };
-    // Update scores in real-time
-    useEffect(() => {
-      if (gameStarted && !isGameOver) {
-        const { score1, score2, cell } = calculateScores(grid, playerMoves);
-        setPlayer1Score(score1);
-        setPlayer2Score(score2);
-        
+
+  // Update scores in real-time
+  useEffect(() => {
+    if (gameStarted && !isGameOver) {
+      const { score1, score2 } = calculateScores(grid, playerMoves);
+      setPlayer1Score(score1);
+      setPlayer2Score(score2);
+    }
+  }, [grid, gameStarted]);
+
+  // Bot move effect
+  useEffect(() => {
+    if (gameMode === 'single-player' && 
+        gameStarted && 
+        !isGameOver && 
+        ((playerTurn === 'second' && currentPlayer === 'Player 1') ||
+         (playerTurn === 'first' && currentPlayer === 'Player 2'))) {
+      makeBotMove();
+    }
+  }, [currentPlayer, gameStarted, isGameOver]);
+
+// Clean up worker when component unmounts
+  useEffect(() => {
+    return () => {
+      botWorker.terminate();
+    };
+  }, []);
+
+  const makeBotMove = async () => {
+    if (!bot) return;
+    
+    setIsBotThinking(true);
+    
+    // Add a small delay to make the bot's move feel more natural
+    await new Promise(resolve => setTimeout(resolve, 500));
+  
+    try {
+      const botMove = bot.makeMove(grid, getUnavailableNumbers);
+      
+      if (botMove) {
+        handleMenuSelect(botMove.value, botMove.row, botMove.col);
       }
-    }, [grid, gameStarted]);
+    } catch (error) {
+      console.error('Error in bot move:', error);
+    } finally {
+      setIsBotThinking(false);
+    }
+  };
 
   // Check if any cell has only one possible option and fill it
   const checkAndAutoFill = (currentGrid) => {
@@ -200,7 +208,14 @@ const isLineComplete = (line) => {
   };
 
   const handleCellClick = (rowIndex, colIndex, event) => {
-    if (!gameStarted || grid[rowIndex][colIndex] !== null) return;
+    if (!gameStarted || 
+        grid[rowIndex][colIndex] !== null || 
+        isBotThinking || 
+        (gameMode === 'single-player' && 
+         ((playerTurn === 'second' && currentPlayer === 'Player 1') ||
+          (playerTurn === 'first' && currentPlayer === 'Player 2')))) {
+      return;
+    }
     
     const cellRect = event.currentTarget.getBoundingClientRect();
     const windowHeight = window.innerHeight;
@@ -217,8 +232,9 @@ const isLineComplete = (line) => {
     setSelectedCell({ rowIndex, colIndex });
   };
 
-  const handleMenuSelect = (value) => {
-    if (!selectedCell) return;
+  const handleMenuSelect = (value, forcedRow = null, forcedCol = null) => {
+    const rowIndex = forcedRow !== null ? forcedRow : selectedCell.rowIndex;
+    const colIndex = forcedCol !== null ? forcedCol : selectedCell.colIndex;
 
     setMoveHistory([...moveHistory, {
       grid: grid.map(row => [...row]),
@@ -234,9 +250,9 @@ const isLineComplete = (line) => {
     let newAutoFilled = autoFilledCells.map(row => [...row]);
     
     // Store which player made this move and mark as not auto-filled
-    newGrid[selectedCell.rowIndex][selectedCell.colIndex] = value;
-    newPlayerMoves[selectedCell.rowIndex][selectedCell.colIndex] = currentPlayer;
-    newAutoFilled[selectedCell.rowIndex][selectedCell.colIndex] = false;
+    newGrid[rowIndex][colIndex] = value;
+    newPlayerMoves[rowIndex][colIndex] = currentPlayer;
+    newAutoFilled[rowIndex][colIndex] = false;
 
     // Check for auto-fill opportunities
     let autoFilledGrid = checkAndAutoFill(newGrid);
@@ -270,44 +286,32 @@ const isLineComplete = (line) => {
 
   const handleStartGame = () => {
     setGameStarted(true);
+    // If playing second in single-player mode, trigger bot's first move
+    if (gameMode === 'single-player' && playerTurn === 'second') {
+      setCurrentPlayer('Player 1');
+    }
   };
 
   const handleUndo = () => {
-    if (moveHistory.length === 0) return;
+    if (moveHistory.length === 0 || 
+        (gameMode === 'single-player' && isBotThinking)) return;
 
     const lastMove = moveHistory[moveHistory.length - 1];
     const previousPlayer = playerHistory[playerHistory.length - 1];
-
+    
     setGrid(lastMove.grid);
     setPlayerMoves(lastMove.playerMoves);
     setPlayer1Score(lastMove.player1Score);
     setPlayer2Score(lastMove.player2Score);
     setCurrentPlayer(previousPlayer);
 
-    // const previousGlowingCells = glowingCellHistory[glowingCellHistory.length - 1];
-    // setGlowingCells(previousGlowingCells);  // Set glowing cells back to previous state
-    // setGlowingCellHistory(glowingCellHistory.slice(0, -1));  // Remove the last glowing state from history
-    // console.log(glowingCells);
-    // console.log(previousGlowingCells);
-    
-  
     // Remove the last state from history
     setMoveHistory(moveHistory.slice(0, -1));
     setPlayerHistory(playerHistory.slice(0, -1));
   };
 
   const handleQuitGame = () => {
-    setGameStarted(false);
-    setGrid(initialGrid);
-    setPlayerMoves(Array(4).fill().map(() => Array(5).fill(null)));
-    setCurrentPlayer('Player 1');
-    setMoveHistory([]);
-    setPlayerHistory([]);
-    setPlayer1Score(0);
-    setPlayer2Score(0);
-    setIsGameOver(false);
-    setWinner(null);
-    setGlowingCells([]);
+    navigate('/');
   };
   
   useEffect(() => {
@@ -331,106 +335,76 @@ const isLineComplete = (line) => {
         gameStarted={gameStarted}
         winner={winner}
       />
-  
-      {(!isGameOver || !gameStarted) && (
-        <div
-          className={`grid-container ${
-            !gameStarted
-              ? 'game-not-started'
-              : currentPlayer === 'Player 1'
-              ? 'player1-turn'
-              : 'player2-turn'
-          }`}
-        >
-          {grid.map((row, rowIndex) =>
-            row.map((cell, colIndex) => {
-              // Find the glowing cell and determine if both row and column glow exist
-              const glowingCell = glowingCells.find(
-                (glow) => glow.row === rowIndex && glow.col === colIndex
-              );
-  
-              let glowingClass = '';
-              if (glowingCell) {
-                glowingClass = 'glowing';  
-              
-                if (glowingCell.row_color && glowingCell.col_color) {
-                  glowingClass += ` double-glow-${glowingCell.row_color}-${glowingCell.col_color}`;
-                }
-                else if (glowingCell.row_color) {
-                  glowingClass += ` row-glow-${glowingCell.row_color}`;
-                }
-                else if (glowingCell.col_color) {
-                  glowingClass += ` col-glow-${glowingCell.col_color}`;
-                }
-                console.log(glowingClass);
-              }
+      
+      {isBotThinking && (
+        <div className="text-center text-gray-400 mt-2 mb-4">
+          Bot is thinking...
+        </div>
+      )}
 
-              
-              
-  
-              return (
-                  <div
-                    key={`${rowIndex}-${colIndex}`}
-                    className={`grid-item ${
-                      cell !== null ? 'cursor-not-allowed' : 'cursor-pointer'
-                    } ${glowingClass}`} // Apply glowingClass here
-                    onClick={(e) => handleCellClick(rowIndex, colIndex, e)}                
-                  >
-                  {cell && (
-                    <span
-                      className={`${
-                        autoFilledCells[rowIndex][colIndex]
-                          ? 'text-gray-400'
-                          : playerMoves[rowIndex][colIndex] === 'Player 1'
-                          ? 'text-pink-400'
+      {(!isGameOver || !gameStarted) && (
+        <div className={`grid-container ${!gameStarted 
+          ? 'game-not-started' 
+          : currentPlayer === 'Player 1' 
+            ? 'player1-turn' 
+            : 'player2-turn'}`}>
+          {grid.map((row, rowIndex) =>
+            row.map((cell, colIndex) => (
+              <div
+                key={`${rowIndex}-${colIndex}`}
+                className={`grid-item ${cell !== null ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                onClick={(e) => handleCellClick(rowIndex, colIndex, e)}
+              >
+                {cell && (
+                  <span 
+                    className={`
+                      ${autoFilledCells[rowIndex][colIndex] 
+                        ? 'text-gray-400' 
+                        : playerMoves[rowIndex][colIndex] === 'Player 1' 
+                          ? 'text-pink-400' 
                           : 'text-blue-400'
-                      }`}
-                    >
-                      {cell}
-                    </span>
-                  )}
-                </div>
-              );
-            })
+                      }
+                    `}
+                  >
+                    {cell}
+                  </span>
+                )}
+              </div>
+            ))
           )}
         </div>
       )}
-  
+      
       {menuPosition && selectedCell && (
         <CellMenu
           position={menuPosition}
           onSelect={handleMenuSelect}
           onClose={handleMenuClose}
-          unavailableNumbers={getUnavailableNumbers(
-            selectedCell.rowIndex,
-            selectedCell.colIndex,
-            grid
-          )}
+          unavailableNumbers={getUnavailableNumbers(selectedCell.rowIndex, selectedCell.colIndex, grid)}
           currentPlayer={currentPlayer}
         />
       )}
-  
+      
       <div className="flex justify-center gap-4 mt-4">
         {!gameStarted ? (
           <Buttons text="Start Game" onClick={handleStartGame} />
         ) : (
           <>
             {!isGameOver && (
-              <Buttons
-                text="Undo"
+              <Buttons 
+                text="Undo" 
                 onClick={handleUndo}
-                otherClass={
-                  moveHistory.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-                }
+                otherClass={moveHistory.length === 0 || 
+                  (gameMode === 'single-player' && isBotThinking) 
+                  ? 'opacity-50 cursor-not-allowed' : ''}
               />
             )}
-            <Buttons text={isGameOver ? 'New Game' : 'Quit Game'} onClick={handleQuitGame} />
+            <Buttons text={isGameOver ? "New Game" : "Quit Game"} onClick={handleQuitGame} />
           </>
         )}
       </div>
     </div>
-    );
-  };
-
+  );
+};
 
 export default Grid;
