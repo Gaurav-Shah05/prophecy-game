@@ -1,5 +1,5 @@
 // botWorker.js
-import OptimalBot from './optimal-bot';
+import {OptimalBot} from './optimal-bot';
 
 const bot = new OptimalBot();
 
